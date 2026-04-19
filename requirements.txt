@@ -1,5 +1,6 @@
 streamlit>=1.32.0,<2.0.0
 pandas>=2.0.0,<3.0.0
+# numpy: no <2.0.0 upper bound — Python 3.13 requires numpy 2.x (no 1.26.x wheels available)
 numpy>=1.24.0
 scipy>=1.12.0
 yfinance>=0.2.40
