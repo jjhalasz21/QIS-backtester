@@ -146,7 +146,8 @@ def test_vol_target_weights_capped_at_max_leverage(monkeypatch):
 
     s = VolTarget()
     s.run("2022-01-01", "2023-12-31", "default")
-    assert s.weights().max() <= 1.51
+    from src.utils.config import MAX_LEVERAGE
+    assert s.weights().max() <= MAX_LEVERAGE
 
 def test_vol_target_institutional_framing(monkeypatch):
     import src.strategies.vol_target as vt_mod
@@ -166,5 +167,7 @@ def test_vol_target_guard_clauses():
         s.equity_curve()
     with pt.raises(RuntimeError):
         s.metrics()
+    with pt.raises(RuntimeError):
+        s.trade_log()
     with pt.raises(RuntimeError):
         s.weights()
