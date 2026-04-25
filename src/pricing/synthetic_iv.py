@@ -10,7 +10,7 @@ def realized_vol(prices: pd.Series, window: int = 20) -> pd.Series:
     Returns NaN for the first (window-1) observations.
     """
     log_returns = np.log(prices / prices.shift(1))
-    return log_returns.rolling(window, min_periods=window-1).std() * np.sqrt(_TRADING_DAYS)
+    return log_returns.rolling(window, min_periods=window - 1).std() * np.sqrt(_TRADING_DAYS)
 
 
 def synthetic_iv(
