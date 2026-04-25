@@ -60,3 +60,27 @@ def test_put_write_guard_clauses():
         s.equity_curve()
     with pytest.raises(RuntimeError):
         s.trade_log()
+
+
+from src.strategies.covered_call import CoveredCall
+
+
+def test_covered_call_run_with_synthetic_data(monkeypatch):
+    import src.strategies.covered_call as cc_mod
+    fake = _make_fake_index()
+    monkeypatch.setattr(cc_mod, "_fetch_index", lambda *a, **kw: fake)
+
+    s = CoveredCall()
+    s.run("2020-01-01", "2021-12-31", "default")
+
+    curve = s.equity_curve()
+    assert isinstance(curve, pd.Series)
+    assert len(curve) > 0
+
+    m = s.metrics()
+    assert "sharpe" in m and "max_dd" in m
+
+def test_covered_call_institutional_framing():
+    s = CoveredCall()
+    framing = s.institutional_framing()
+    assert "structurer_pitch" in framing

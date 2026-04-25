@@ -5,6 +5,7 @@ import plotly.express as px
 import numpy as np
 
 from src.strategies.put_write import PutWrite
+from src.strategies.covered_call import CoveredCall
 from src.analytics.tearsheet import drawdown_series, monthly_heatmap_data, compute_all
 from src.utils.config import BACKTEST_START, BACKTEST_END
 
@@ -51,6 +52,13 @@ def _run_put_write(start, end, cost_mode, custom_bps):
     return s.equity_curve(), s.metrics(), s.trade_log(), s.institutional_framing()
 
 
+@st.cache_data(show_spinner="Running backtest…")
+def _run_covered_call(start, end, cost_mode, custom_bps):
+    s = CoveredCall()
+    s.run(start, end, cost_mode, custom_bps)
+    return s.equity_curve(), s.metrics(), s.trade_log(), s.institutional_framing()
+
+
 # ── Page routing ─────────────────────────────────────────────────────────────
 if page == "Overview":
     st.title("QIS Backtester")
@@ -62,11 +70,12 @@ if page == "Overview":
         > **AiPEX-Lite disclaimer:** Independently implemented, inspired by HSBC's AiPEX concept.
         > Does not replicate HSBC's proprietary methodology.
 
-        *More strategies loading — check back soon.*
+        *Strategy C (Vol-Targeted SPX) and Strategy E (AiPEX-Lite) coming soon.*
         """
     )
 
     curve, m, _log, _framing = _run_put_write(start_date, end_date, cost_mode, custom_bps)
+    bxm_curve, bxm_m, _bxm_log, _bxm_framing = _run_covered_call(start_date, end_date, cost_mode, custom_bps)
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("CAGR", f"{m['cagr']:.1%}")
@@ -76,6 +85,7 @@ if page == "Overview":
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=curve.index, y=curve, name="CBOE PUT", line=dict(color="#1f77b4")))
+    fig.add_trace(go.Scatter(x=bxm_curve.index, y=bxm_curve, name="CBOE BXM", line=dict(color="#ff7f0e")))
     fig.update_layout(
         title="Cumulative Return (base 100)",
         xaxis_title="Date",
@@ -86,15 +96,23 @@ if page == "Overview":
     st.plotly_chart(fig, use_container_width=True)
 
 elif page == "Strategy Explorer":
-    strategy_choice = st.sidebar.selectbox("Strategy", ["CBOE PUT — Insurance Carry"])
-
-    curve, m, _log, framing = _run_put_write(start_date, end_date, cost_mode, custom_bps)
-
-    st.title("CBOE PUT — Insurance Carry")
-    st.caption(
-        "Fully collateralized 1-month ATM SPX put-write, tracking the CBOE PUT Index. "
-        "Published index values used directly — no per-option simulation required."
+    strategy_choice = st.sidebar.selectbox(
+        "Strategy",
+        ["CBOE PUT — Insurance Carry", "CBOE BXM — Yield Enhancement Overlay"],
     )
+    _strategy_runners = {
+        "CBOE PUT — Insurance Carry": _run_put_write,
+        "CBOE BXM — Yield Enhancement Overlay": _run_covered_call,
+    }
+    curve, m, _log, framing = _strategy_runners[strategy_choice](start_date, end_date, cost_mode, custom_bps)
+
+    strategy_names = {
+        "CBOE PUT — Insurance Carry": ("CBOE PUT — Insurance Carry", "Fully collateralized 1-month ATM SPX put-write, tracking the CBOE PUT Index. Published index values used directly — no per-option simulation required."),
+        "CBOE BXM — Yield Enhancement Overlay": ("CBOE BXM — Yield Enhancement Overlay", "Long SPX + short 1-month ATM call, tracking the CBOE BXM Index. Published index values used directly — no per-option simulation required."),
+    }
+    title, caption = strategy_names[strategy_choice]
+    st.title(title)
+    st.caption(caption)
 
     # ── Headline metrics ─────────────────────────────────────────────────────
     cols = st.columns(6)
