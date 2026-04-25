@@ -97,8 +97,8 @@ class AiPexLite(BaseStrategy):
             raise ValueError("Not enough data to compute AiPEX-Lite returns. Extend the backtest window.")
 
         ret_df = pd.DataFrame(portfolio_returns).set_index("date")
-        self._equity = (1 + ret_df["net_return"]).cumprod() * 100
-        self._equity.name = self.name
+        equity = (1 + ret_df["net_return"]).cumprod() * 100
+        self._equity = (equity / equity.iloc[0] * 100).rename(self.name)
         self._trade_log = pd.DataFrame(trades).set_index("date") if trades else pd.DataFrame()
         self._metrics = tearsheet.compute_all(self._equity)
 

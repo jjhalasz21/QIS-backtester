@@ -224,9 +224,9 @@ def test_aipex_trade_log_has_cost_bps(monkeypatch):
     s = AiPexLite()
     s.run("2019-01-01", "2021-01-01", "default")
     log = s.trade_log()
-    if not log.empty:
-        assert "cost_bps" in log.columns
-        assert (log["cost_bps"] >= 0).all()
+    assert not log.empty
+    assert "cost_bps" in log.columns
+    assert (log["cost_bps"] >= 0).all()
 
 def test_aipex_institutional_framing():
     s = AiPexLite()
