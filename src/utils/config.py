@@ -1,0 +1,28 @@
+from pathlib import Path
+import datetime
+
+ROOT = Path(__file__).parent.parent.parent
+DATA_DIR = ROOT / "data"
+DATA_DIR.mkdir(exist_ok=True)
+
+BACKTEST_START = "2007-01-01"
+BACKTEST_END = datetime.date.today().strftime("%Y-%m-%d")
+
+SPX_TICKER = "^GSPC"
+SPY_TICKER = "SPY"
+VIX_TICKER = "^VIX"
+TNX_TICKER = "^TNX"
+
+SECTOR_ETFS = ["XLK", "XLF", "XLV", "XLE", "XLY"]
+
+FRED_PUT = "PUTWRITE"
+FRED_BXM = "BXMCBOE"
+
+TRADING_DAYS_PER_YEAR = 252
+VOL_TARGET = 0.10
+MAX_LEVERAGE = 1.5
+VOL_LOOKBACK = 20
+VIX_RISK_OFF_THRESHOLD = 30
+AIPEX_TOP_N = 3
+MOMENTUM_WINDOW = 252
+MOMENTUM_SKIP = 21
