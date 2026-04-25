@@ -116,3 +116,55 @@ def test_covered_call_guard_clauses():
         s.equity_curve()
     with pytest.raises(RuntimeError):
         s.trade_log()
+
+
+from src.strategies.vol_target import VolTarget
+
+
+def test_vol_target_run_with_synthetic_data(monkeypatch):
+    import src.strategies.vol_target as vt_mod
+    fake = _make_fake_index()
+    monkeypatch.setattr(vt_mod, "_fetch_spy", lambda *a, **kw: fake)
+
+    s = VolTarget()
+    s.run("2020-01-01", "2021-12-31", "default")
+
+    curve = s.equity_curve()
+    assert isinstance(curve, pd.Series)
+    assert len(curve) > 100
+
+    m = s.metrics()
+    assert "sharpe" in m
+
+def test_vol_target_weights_capped_at_max_leverage(monkeypatch):
+    import src.strategies.vol_target as vt_mod
+    low_vol_prices = pd.Series(
+        100 * np.cumprod(1 + np.random.normal(0.0005, 0.001, 300)),
+        index=pd.bdate_range("2022-01-03", periods=300),
+    )
+    monkeypatch.setattr(vt_mod, "_fetch_spy", lambda *a, **kw: low_vol_prices)
+
+    s = VolTarget()
+    s.run("2022-01-01", "2023-12-31", "default")
+    assert s.weights().max() <= 1.51
+
+def test_vol_target_institutional_framing(monkeypatch):
+    import src.strategies.vol_target as vt_mod
+    fake = _make_fake_index()
+    monkeypatch.setattr(vt_mod, "_fetch_spy", lambda *a, **kw: fake)
+    s = VolTarget()
+    s.run("2020-01-01", "2021-12-31", "default")
+    framing = s.institutional_framing()
+    for key in ("return_profile", "capital_efficiency", "regulatory_treatment", "liability_fit", "structurer_pitch"):
+        assert key in framing
+        assert isinstance(framing[key], str) and len(framing[key]) > 20
+
+def test_vol_target_guard_clauses():
+    s = VolTarget()
+    import pytest as pt
+    with pt.raises(RuntimeError):
+        s.equity_curve()
+    with pt.raises(RuntimeError):
+        s.metrics()
+    with pt.raises(RuntimeError):
+        s.weights()

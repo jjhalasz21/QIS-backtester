@@ -6,6 +6,7 @@ import numpy as np
 
 from src.strategies.put_write import PutWrite
 from src.strategies.covered_call import CoveredCall
+from src.strategies.vol_target import VolTarget
 from src.analytics.tearsheet import drawdown_series, monthly_heatmap_data, compute_all
 from src.utils.config import BACKTEST_START, BACKTEST_END
 
@@ -59,10 +60,18 @@ def _run_covered_call(start, end, cost_mode, custom_bps):
     return s.equity_curve(), s.metrics(), s.trade_log(), s.institutional_framing()
 
 
+@st.cache_data(show_spinner="Running backtest…")
+def _run_vol_target(start, end, cost_mode, custom_bps):
+    s = VolTarget()
+    s.run(start, end, cost_mode, custom_bps)
+    return s.equity_curve(), s.metrics(), s.trade_log(), s.institutional_framing()
+
+
 # Single source of truth for strategy display — add new strategies here only
 _STRATEGIES = [
     (PutWrite.name, PutWrite.description, _run_put_write),
     (CoveredCall.name, CoveredCall.description, _run_covered_call),
+    (VolTarget.name, VolTarget.description, _run_vol_target),
 ]
 _STRATEGY_MAP = {name: (desc, runner) for name, desc, runner in _STRATEGIES}
 
@@ -78,12 +87,13 @@ if page == "Overview":
         > **AiPEX-Lite disclaimer:** Independently implemented, inspired by HSBC's AiPEX concept.
         > Does not replicate HSBC's proprietary methodology.
 
-        *Strategy C (Vol-Targeted SPX) and Strategy E (AiPEX-Lite) coming soon.*
+        *Strategy E (AiPEX-Lite) coming soon.*
         """
     )
 
     curve, m, _log, _framing = _run_put_write(start_date, end_date, cost_mode, custom_bps)
     bxm_curve, bxm_m, _bxm_log, _bxm_framing = _run_covered_call(start_date, end_date, cost_mode, custom_bps)
+    vt_curve, vt_m, _vt_log, _vt_framing = _run_vol_target(start_date, end_date, cost_mode, custom_bps)
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("CAGR", f"{m['cagr']:.1%}")
@@ -94,6 +104,7 @@ if page == "Overview":
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=curve.index, y=curve, name="CBOE PUT", line=dict(color="#1f77b4")))
     fig.add_trace(go.Scatter(x=bxm_curve.index, y=bxm_curve, name="CBOE BXM", line=dict(color="#ff7f0e")))
+    fig.add_trace(go.Scatter(x=vt_curve.index, y=vt_curve, name="Vol-Targeted SPX", line=dict(color="#2ca02c")))
     fig.update_layout(
         title="Cumulative Return (base 100)",
         xaxis_title="Date",
