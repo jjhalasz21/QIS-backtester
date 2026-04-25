@@ -59,6 +59,14 @@ def _run_covered_call(start, end, cost_mode, custom_bps):
     return s.equity_curve(), s.metrics(), s.trade_log(), s.institutional_framing()
 
 
+# Single source of truth for strategy display — add new strategies here only
+_STRATEGIES = [
+    (PutWrite.name, PutWrite.description, _run_put_write),
+    (CoveredCall.name, CoveredCall.description, _run_covered_call),
+]
+_STRATEGY_MAP = {name: (desc, runner) for name, desc, runner in _STRATEGIES}
+
+
 # ── Page routing ─────────────────────────────────────────────────────────────
 if page == "Overview":
     st.title("QIS Backtester")
@@ -96,23 +104,12 @@ if page == "Overview":
     st.plotly_chart(fig, use_container_width=True)
 
 elif page == "Strategy Explorer":
-    strategy_choice = st.sidebar.selectbox(
-        "Strategy",
-        ["CBOE PUT — Insurance Carry", "CBOE BXM — Yield Enhancement Overlay"],
-    )
-    _strategy_runners = {
-        "CBOE PUT — Insurance Carry": _run_put_write,
-        "CBOE BXM — Yield Enhancement Overlay": _run_covered_call,
-    }
-    curve, m, _log, framing = _strategy_runners[strategy_choice](start_date, end_date, cost_mode, custom_bps)
+    strategy_choice = st.sidebar.selectbox("Strategy", [s[0] for s in _STRATEGIES])
+    _desc, _runner = _STRATEGY_MAP[strategy_choice]
+    curve, m, _log, framing = _runner(start_date, end_date, cost_mode, custom_bps)
 
-    strategy_names = {
-        "CBOE PUT — Insurance Carry": ("CBOE PUT — Insurance Carry", "Fully collateralized 1-month ATM SPX put-write, tracking the CBOE PUT Index. Published index values used directly — no per-option simulation required."),
-        "CBOE BXM — Yield Enhancement Overlay": ("CBOE BXM — Yield Enhancement Overlay", "Long SPX + short 1-month ATM call, tracking the CBOE BXM Index. Published index values used directly — no per-option simulation required."),
-    }
-    title, caption = strategy_names[strategy_choice]
-    st.title(title)
-    st.caption(caption)
+    st.title(strategy_choice)
+    st.caption(_desc)
 
     # ── Headline metrics ─────────────────────────────────────────────────────
     cols = st.columns(6)

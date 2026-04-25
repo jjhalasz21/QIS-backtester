@@ -84,3 +84,35 @@ def test_covered_call_institutional_framing():
     s = CoveredCall()
     framing = s.institutional_framing()
     assert "structurer_pitch" in framing
+
+
+def test_covered_call_equity_starts_at_100(monkeypatch):
+    import src.strategies.covered_call as cc_mod
+    fake = _make_fake_index()
+    monkeypatch.setattr(cc_mod, "_fetch_index", lambda *a, **kw: fake)
+
+    s = CoveredCall()
+    s.run("2020-01-01", "2021-12-31", "default")
+    assert s.equity_curve().iloc[0] == pytest.approx(100.0, rel=0.01)
+
+
+def test_covered_call_trade_log_schema(monkeypatch):
+    import src.strategies.covered_call as cc_mod
+    fake = _make_fake_index()
+    monkeypatch.setattr(cc_mod, "_fetch_index", lambda *a, **kw: fake)
+
+    s = CoveredCall()
+    s.run("2020-01-01", "2021-12-31", "default")
+    log = s.trade_log()
+    assert isinstance(log, pd.DataFrame)
+    assert {"notional", "gross_pnl", "cost_bps", "net_pnl"}.issubset(log.columns)
+
+
+def test_covered_call_guard_clauses():
+    s = CoveredCall()
+    with pytest.raises(RuntimeError):
+        s.metrics()
+    with pytest.raises(RuntimeError):
+        s.equity_curve()
+    with pytest.raises(RuntimeError):
+        s.trade_log()
