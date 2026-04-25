@@ -171,3 +171,76 @@ def test_vol_target_guard_clauses():
         s.trade_log()
     with pt.raises(RuntimeError):
         s.weights()
+
+
+from src.strategies.aipex_lite import AiPexLite
+
+def _make_sector_prices(tickers, n=500, start="2019-01-02"):
+    np.random.seed(99)
+    return {
+        t: pd.Series(
+            100 * np.cumprod(1 + np.random.normal(0.0004, 0.01, n)),
+            index=pd.bdate_range(start, periods=n),
+        )
+        for t in tickers
+    }
+
+def test_aipex_run_with_synthetic_data(monkeypatch):
+    import src.strategies.aipex_lite as al_mod
+    from src.utils.config import SECTOR_ETFS
+
+    sector_data = _make_sector_prices(SECTOR_ETFS)
+    vix_data = pd.Series(15.0, index=sector_data[SECTOR_ETFS[0]].index)
+
+    def fake_fetch(ticker, start, end, **kw):
+        if ticker in sector_data:
+            return sector_data[ticker]
+        return vix_data
+
+    monkeypatch.setattr(al_mod, "_fetch_prices", fake_fetch)
+
+    s = AiPexLite()
+    s.run("2019-01-01", "2021-01-01", "default")
+
+    curve = s.equity_curve()
+    assert isinstance(curve, pd.Series)
+    assert len(curve) >= 10
+
+    m = s.metrics()
+    assert "sharpe" in m
+
+def test_aipex_trade_log_has_cost_bps(monkeypatch):
+    import src.strategies.aipex_lite as al_mod
+    from src.utils.config import SECTOR_ETFS
+
+    sector_data = _make_sector_prices(SECTOR_ETFS)
+    vix_data = pd.Series(15.0, index=sector_data[SECTOR_ETFS[0]].index)
+
+    def fake_fetch(ticker, start, end, **kw):
+        return sector_data.get(ticker, vix_data)
+
+    monkeypatch.setattr(al_mod, "_fetch_prices", fake_fetch)
+
+    s = AiPexLite()
+    s.run("2019-01-01", "2021-01-01", "default")
+    log = s.trade_log()
+    if not log.empty:
+        assert "cost_bps" in log.columns
+        assert (log["cost_bps"] >= 0).all()
+
+def test_aipex_institutional_framing():
+    s = AiPexLite()
+    framing = s.institutional_framing()
+    for key in ("return_profile", "capital_efficiency", "regulatory_treatment", "liability_fit", "structurer_pitch"):
+        assert key in framing
+        assert isinstance(framing[key], str) and len(framing[key]) > 20
+
+def test_aipex_guard_clauses():
+    s = AiPexLite()
+    import pytest as pt
+    with pt.raises(RuntimeError):
+        s.equity_curve()
+    with pt.raises(RuntimeError):
+        s.metrics()
+    with pt.raises(RuntimeError):
+        s.trade_log()
