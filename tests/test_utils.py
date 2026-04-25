@@ -1,10 +1,11 @@
 import pytest
 from datetime import date
-from src.utils.config import DATA_DIR, BACKTEST_START, SECTOR_ETFS
+from src.utils.config import DATA_DIR, BACKTEST_START, SECTOR_ETFS, ROOT
 from src.utils.calendar import trading_days
 
-def test_data_dir_exists():
-    assert DATA_DIR.exists()
+def test_data_dir_is_in_project_root():
+    assert DATA_DIR.name == "data"
+    assert DATA_DIR.parent == ROOT
 
 def test_backtest_start_is_2007():
     assert BACKTEST_START == "2007-01-01"

@@ -3,7 +3,6 @@ import datetime
 
 ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = ROOT / "data"
-DATA_DIR.mkdir(exist_ok=True)
 
 BACKTEST_START = "2007-01-01"
 BACKTEST_END = datetime.date.today().strftime("%Y-%m-%d")
