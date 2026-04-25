@@ -35,13 +35,16 @@ class PutWrite(BaseStrategy):
         cost_mode: str = "default",
         custom_bps: float = 0.0,
     ) -> None:
+        # cost_mode / custom_bps intentionally unused: the CBOE PUT Index
+        # settlement prices already embed transaction costs. trade_log carries
+        # cost_bps=0.0 to signal this to any downstream cost re-application logic.
         index = _fetch_index(start, end)
         index = index.sort_index().dropna()
 
         returns = index.pct_change().dropna()
 
         # Build equity curve (base 100)
-        self._equity = (1 + returns).cumprod() * 100
+        self._equity = ((1 + returns).cumprod() * 100).copy()
         self._equity.iloc[0] = 100.0
         self._equity.name = self.name
 

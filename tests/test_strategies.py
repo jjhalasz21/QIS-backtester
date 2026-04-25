@@ -42,6 +42,7 @@ def test_put_write_run_with_synthetic_data(monkeypatch):
 
     log = s.trade_log()
     assert isinstance(log, pd.DataFrame)
+    assert set(["notional", "gross_pnl", "cost_bps", "net_pnl"]).issubset(log.columns)
 
 
 def test_put_write_institutional_framing_keys():
@@ -49,3 +50,13 @@ def test_put_write_institutional_framing_keys():
     framing = s.institutional_framing()
     assert "return_profile" in framing
     assert "structurer_pitch" in framing
+
+
+def test_put_write_guard_clauses():
+    s = PutWrite()
+    with pytest.raises(RuntimeError):
+        s.metrics()
+    with pytest.raises(RuntimeError):
+        s.equity_curve()
+    with pytest.raises(RuntimeError):
+        s.trade_log()
