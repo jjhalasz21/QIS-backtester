@@ -1,7 +1,8 @@
 from __future__ import annotations
+import io
 import pandas as pd
+import requests
 import yfinance as yf
-import pandas_datareader as pdr
 from src.data.cache import cache_key, load, save
 
 
@@ -41,11 +42,15 @@ def fetch_fred(
         if cached is not None:
             return cached["value"]
 
-    df = pdr.get_data_fred(series_id, start=start, end=end)
+    url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+    df = pd.read_csv(io.StringIO(resp.text), parse_dates=["DATE"], index_col="DATE")
+    df = df[(df.index >= pd.Timestamp(start)) & (df.index <= pd.Timestamp(end))]
     if df.empty:
         raise ValueError(f"FRED returned no data for {series_id} ({start}–{end})")
 
-    series = df.iloc[:, 0].dropna()
+    series = df.iloc[:, 0].replace(".", float("nan")).astype(float).dropna()
     series.index = pd.to_datetime(series.index)
     save(key, pd.DataFrame({"value": series}))
     return series
