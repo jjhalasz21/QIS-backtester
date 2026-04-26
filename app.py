@@ -89,15 +89,12 @@ _STRATEGY_MAP = {name: (desc, runner) for name, desc, runner in _STRATEGIES}
 if page == "Overview":
     st.title("QIS Backtester")
     st.markdown(
-        """
-        A systematic equity derivatives backtesting platform simulating four institutional strategies
-        against Solvency II and NAIC capital constraints.
-
-        > **AiPEX-Lite disclaimer:** Independently implemented, inspired by HSBC's AiPEX concept.
-        > Does not replicate HSBC's proprietary methodology.
-
-        *Now featuring Strategy E: AiPEX-Lite sector ETF momentum rotation.*
-        """
+        "A systematic equity derivatives backtesting platform simulating four institutional "
+        "strategies against Solvency II and NAIC capital constraints."
+    )
+    st.caption(
+        "AiPEX-Lite is independently implemented, inspired by HSBC's AiPEX concept. "
+        "Does not replicate HSBC's proprietary methodology."
     )
 
     curve, m, _log, _framing = _run_put_write(start_date, end_date, cost_mode, custom_bps)
@@ -105,17 +102,24 @@ if page == "Overview":
     vt_curve, vt_m, _vt_log, _vt_framing = _run_vol_target(start_date, end_date, cost_mode, custom_bps)
     aipex_curve, aipex_m, _aipex_log, _aipex_framing = _run_aipex(start_date, end_date, cost_mode, custom_bps)
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("CAGR", f"{m['cagr']:.1%}")
-    col2.metric("Sharpe", f"{m['sharpe']:.2f}")
-    col3.metric("Max Drawdown", f"{m['max_dd']:.1%}")
-    col4.metric("Annualized Vol", f"{m['vol']:.1%}")
+    _all_curves = [curve, bxm_curve, vt_curve, aipex_curve]
+    _all_metrics = [m, bxm_m, vt_m, aipex_m]
+    _overview_names = [s[0] for s in _STRATEGIES]
 
+    overview_choice = st.selectbox("Highlight strategy metrics", _overview_names, key="overview_select")
+    _ov_idx = _overview_names.index(overview_choice)
+    _ov_m = _all_metrics[_ov_idx]
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("CAGR",     f"{_ov_m['cagr']:.1%}")
+    col2.metric("Sharpe",   f"{_ov_m['sharpe']:.2f}")
+    col3.metric("Max DD",   f"{_ov_m['max_dd']:.1%}")
+    col4.metric("Ann. Vol", f"{_ov_m['vol']:.1%}")
+
+    _ov_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd"]
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=curve.index, y=curve, name="CBOE PUT", line=dict(color="#1f77b4")))
-    fig.add_trace(go.Scatter(x=bxm_curve.index, y=bxm_curve, name="CBOE BXM", line=dict(color="#ff7f0e")))
-    fig.add_trace(go.Scatter(x=vt_curve.index, y=vt_curve, name="Vol-Targeted SPX", line=dict(color="#2ca02c")))
-    fig.add_trace(go.Scatter(x=aipex_curve.index, y=aipex_curve, name="AiPEX-Lite", line=dict(color="#9467bd")))
+    for _n, _c, _col in zip(_overview_names, _all_curves, _ov_colors):
+        fig.add_trace(go.Scatter(x=_c.index, y=_c, name=_n, line=dict(color=_col)))
     fig.update_layout(
         title="Cumulative Return (base 100)",
         xaxis_title="Date",
@@ -133,17 +137,20 @@ elif page == "Strategy Explorer":
 
     st.caption(_desc)
 
-    # ── Headline metrics ─────────────────────────────────────────────────────
-    cols = st.columns(6)
+    # ── Headline metrics — two rows of 3 to prevent truncation ───────────────
     metrics_display = [
         ("CAGR", f"{m['cagr']:.1%}"),
         ("Sharpe", f"{m['sharpe']:.2f}"),
         ("Sortino", f"{m['sortino']:.2f}"),
         ("Max DD", f"{m['max_dd']:.1%}"),
-        ("Vol", f"{m['vol']:.1%}"),
+        ("Ann. Vol", f"{m['vol']:.1%}"),
         ("Skew", f"{m['skew']:.2f}"),
     ]
-    for col, (label, value) in zip(cols, metrics_display):
+    row1 = st.columns(3)
+    row2 = st.columns(3)
+    for col, (label, value) in zip(row1, metrics_display[:3]):
+        col.metric(label, value)
+    for col, (label, value) in zip(row2, metrics_display[3:]):
         col.metric(label, value)
 
     st.markdown("---")
@@ -300,8 +307,8 @@ elif page == "Client Pitch":
     cols = st.columns(5)
     cols[0].metric("CAGR", f"{pitch_m['cagr']:.1%}")
     cols[1].metric("Sharpe", f"{pitch_m['sharpe']:.2f}")
-    cols[2].metric("Max Drawdown", f"{pitch_m['max_dd']:.1%}")
-    cols[3].metric("Annualized Vol", f"{pitch_m['vol']:.1%}")
+    cols[2].metric("Max DD", f"{pitch_m['max_dd']:.1%}")
+    cols[3].metric("Ann. Vol", f"{pitch_m['vol']:.1%}")
     cols[4].metric("Sortino", f"{pitch_m['sortino']:.2f}")
 
     fig = go.Figure()
