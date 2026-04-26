@@ -8,7 +8,8 @@ from src.strategies.put_write import PutWrite
 from src.strategies.covered_call import CoveredCall
 from src.strategies.vol_target import VolTarget
 from src.strategies.aipex_lite import AiPexLite
-from src.analytics.tearsheet import drawdown_series, monthly_heatmap_data
+from src.analytics.tearsheet import drawdown_series, monthly_heatmap_data, compute_all
+from src.data.loader import fetch_prices
 from src.utils.config import BACKTEST_START, BACKTEST_END
 
 st.set_page_config(
@@ -190,6 +191,7 @@ _FONT = "#CCCCCC"
 # PUT=HSBC red, BXM=sky blue, VolTarget=amber, AiPEX=emerald
 _COLORS = ["#DB0011", "#38BDF8", "#F59E0B", "#10B981"]
 _STRAT_NAMES = ["CBOE PUT", "CBOE BXM", "Vol-Targeted SPX", "AiPEX-Lite"]
+_SPX_COLOR = "#94A3B8"  # slate gray — benchmark reference line
 
 
 def _dark(title: str = "", height: int = 400, **kwargs) -> dict:
@@ -297,6 +299,13 @@ def _run_aipex(start, end, cost_mode, custom_bps):
     return s.equity_curve(), s.metrics(), s.trade_log(), s.institutional_framing()
 
 
+@st.cache_data(show_spinner="Loading benchmark…")
+def _run_spx(start, end):
+    px = fetch_prices("SPY", start, end).sort_index().dropna()
+    equity = (px / px.iloc[0] * 100).rename("S&P 500")
+    return equity, compute_all(equity)
+
+
 _STRATEGIES = [
     (PutWrite.name,   PutWrite.description,   _run_put_write),
     (CoveredCall.name, CoveredCall.description, _run_covered_call),
@@ -332,9 +341,16 @@ if page == "Overview":
     col3.metric("Max DD",   f"{_ov_m['max_dd']:.1%}")
     col4.metric("Ann. Vol", f"{_ov_m['vol']:.1%}")
 
-    _section_header("Cumulative Return — All Strategies")
+    spx_curve, _ = _run_spx(start_date, end_date)
+
+    _section_header("Cumulative Return — All Strategies vs S&P 500")
 
     fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=spx_curve.index, y=spx_curve, name="S&P 500",
+        line=dict(color=_SPX_COLOR, width=1.5, dash="dash"),
+        opacity=0.8,
+    ))
     for _n, _c, _col in zip(_ov_names, _all_curves, _COLORS):
         _width = 2.5 if _n == overview_choice else 1.2
         _opacity = 1.0 if _n == overview_choice else 0.45
@@ -363,27 +379,35 @@ elif page == "Strategy Explorer":
     st.caption(_desc)
 
     _section_header("Performance Summary")
+    # fetch spx metrics for delta comparison (loaded later anyway for chart)
+    _, spx_m_early = _run_spx(start_date, end_date)
     metrics_display = [
-        ("CAGR",     f"{m['cagr']:.1%}"),
-        ("Sharpe",   f"{m['sharpe']:.2f}"),
-        ("Sortino",  f"{m['sortino']:.2f}"),
-        ("Max DD",   f"{m['max_dd']:.1%}"),
-        ("Ann. Vol", f"{m['vol']:.1%}"),
-        ("Skew",     f"{m['skew']:.2f}"),
+        ("CAGR",     f"{m['cagr']:.1%}",    f"{m['cagr'] - spx_m_early['cagr']:+.1%} vs S&P 500"),
+        ("Sharpe",   f"{m['sharpe']:.2f}",  f"{m['sharpe'] - spx_m_early['sharpe']:+.2f} vs S&P 500"),
+        ("Sortino",  f"{m['sortino']:.2f}", None),
+        ("Max DD",   f"{m['max_dd']:.1%}",  f"{m['max_dd'] - spx_m_early['max_dd']:+.1%} vs S&P 500"),
+        ("Ann. Vol", f"{m['vol']:.1%}",     None),
+        ("Skew",     f"{m['skew']:.2f}",    None),
     ]
     row1 = st.columns(3)
     row2 = st.columns(3)
-    for col, (label, value) in zip(row1, metrics_display[:3]):
-        col.metric(label, value)
-    for col, (label, value) in zip(row2, metrics_display[3:]):
-        col.metric(label, value)
+    for col, (label, value, delta) in zip(row1, metrics_display[:3]):
+        col.metric(label, value, delta)
+    for col, (label, value, delta) in zip(row2, metrics_display[3:]):
+        col.metric(label, value, delta)
 
-    _section_header("Equity Curve")
+    _section_header("Equity Curve vs S&P 500")
     _ov_names_local = [s[0] for s in _STRATEGIES]
     _strat_color = _COLORS[_ov_names_local.index(strategy_choice)] if strategy_choice in _ov_names_local else "#DB0011"
+    spx_curve, spx_m = _run_spx(start_date, end_date)
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=curve.index, y=curve, name="Equity",
+        x=spx_curve.index, y=spx_curve, name="S&P 500",
+        line=dict(color=_SPX_COLOR, width=1.5, dash="dash"),
+        opacity=0.8,
+    ))
+    fig.add_trace(go.Scatter(
+        x=curve.index, y=curve, name=strategy_choice,
         line=dict(color=_strat_color, width=2),
     ))
     fig.update_layout(**_dark("", height=360, yaxis_title="Index (base 100)"))
@@ -456,11 +480,17 @@ elif page == "Strategy Comparison":
     bxm_curve,   bxm_m,   bxm_log,   _ = _run_covered_call(start_date, end_date, cost_mode, custom_bps)
     vt_curve,    vt_m,    vt_log,    _ = _run_vol_target(start_date, end_date, cost_mode, custom_bps)
     aipex_curve, aipex_m, aipex_log, _ = _run_aipex(start_date, end_date, cost_mode, custom_bps)
+    spx_curve,   spx_m                 = _run_spx(start_date, end_date)
 
     curves = [put_curve, bxm_curve, vt_curve, aipex_curve]
 
-    _section_header("Cumulative Return")
+    _section_header("Cumulative Return vs S&P 500")
     fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=spx_curve.index, y=spx_curve, name="S&P 500",
+        line=dict(color=_SPX_COLOR, width=1.5, dash="dash"),
+        opacity=0.8,
+    ))
     for name, c, color in zip(_STRAT_NAMES, curves, _COLORS):
         fig.add_trace(go.Scatter(x=c.index, y=c, name=name, line=dict(color=color, width=2)))
     fig.update_layout(**_dark("", height=420, yaxis_title="Index (base 100)"))
@@ -468,7 +498,7 @@ elif page == "Strategy Comparison":
 
     _section_header("Performance Metrics")
     metric_rows = []
-    for name, m in zip(_STRAT_NAMES, [put_m, bxm_m, vt_m, aipex_m]):
+    for name, m in zip(_STRAT_NAMES + ["S&P 500"], [put_m, bxm_m, vt_m, aipex_m, spx_m]):
         metric_rows.append({
             "Strategy":   name,
             "CAGR":       f"{m['cagr']:.1%}",
@@ -484,8 +514,11 @@ elif page == "Strategy Comparison":
         })
     st.dataframe(pd.DataFrame(metric_rows).set_index("Strategy"), use_container_width=True)
 
-    _section_header("Return Correlations")
-    ret_df = pd.DataFrame({n: c.pct_change().dropna() for n, c in zip(_STRAT_NAMES, curves)})
+    _section_header("Return Correlations (incl. S&P 500)")
+    ret_df = pd.DataFrame({
+        **{n: c.pct_change().dropna() for n, c in zip(_STRAT_NAMES, curves)},
+        "S&P 500": spx_curve.pct_change().dropna(),
+    })
     corr = ret_df.corr()
     fig_corr = px.imshow(
         corr, text_auto=".2f",
@@ -544,7 +577,13 @@ elif page == "Client Pitch":
     cols[4].metric("Sortino",  f"{pitch_m['sortino']:.2f}")
 
     _pitch_color = _COLORS[[s[0] for s in _STRATEGIES].index(pitch_choice)]
+    spx_curve_p, _ = _run_spx(start_date, end_date)
     fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=spx_curve_p.index, y=spx_curve_p, name="S&P 500",
+        line=dict(color=_SPX_COLOR, width=1.5, dash="dash"),
+        opacity=0.8,
+    ))
     fig.add_trace(go.Scatter(
         x=pitch_curve.index, y=pitch_curve,
         name=pitch_choice, line=dict(color=_pitch_color, width=2.5),
@@ -552,7 +591,6 @@ elif page == "Client Pitch":
     fig.update_layout(**_dark(
         f"Cumulative Return  ·  {start_date[:4]}–{end_date[:4]}  ·  Base 100",
         height=320,
-        showlegend=False,
         yaxis_title="Index (base 100)",
     ))
     st.plotly_chart(fig, use_container_width=True)
