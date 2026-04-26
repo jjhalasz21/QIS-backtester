@@ -126,11 +126,11 @@ if page == "Overview":
     st.plotly_chart(fig, use_container_width=True)
 
 elif page == "Strategy Explorer":
-    strategy_choice = st.sidebar.selectbox("Strategy", [s[0] for s in _STRATEGIES])
+    st.title("Strategy Explorer")
+    strategy_choice = st.selectbox("Select strategy", [s[0] for s in _STRATEGIES])
     _desc, _runner = _STRATEGY_MAP[strategy_choice]
     curve, m, _log, framing = _runner(start_date, end_date, cost_mode, custom_bps)
 
-    st.title(strategy_choice)
     st.caption(_desc)
 
     # ── Headline metrics ─────────────────────────────────────────────────────
@@ -282,8 +282,8 @@ elif page == "Strategy Comparison":
 
 elif page == "Client Pitch":
     st.title("Client Pitch View")
-    pitch_choice = st.sidebar.selectbox(
-        "Strategy for pitch",
+    pitch_choice = st.selectbox(
+        "Select strategy for pitch",
         [s[0] for s in _STRATEGIES],
     )
     _pitch_desc, _pitch_runner = _STRATEGY_MAP[pitch_choice]
