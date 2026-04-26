@@ -5,8 +5,8 @@ _TRADING_DAYS = 252
 
 
 def cagr(equity: pd.Series) -> float:
-    n_years = len(equity) / _TRADING_DAYS
-    if n_years == 0:
+    n_years = (equity.index[-1] - equity.index[0]).days / 365.25
+    if n_years <= 0:
         return 0.0
     return float((equity.iloc[-1] / equity.iloc[0]) ** (1 / n_years) - 1)
 

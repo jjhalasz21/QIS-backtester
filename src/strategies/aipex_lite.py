@@ -45,7 +45,7 @@ class AiPexLite(BaseStrategy):
         monthly_ends = price_df.resample("ME").last().index
 
         trades = []
-        portfolio_returns = []
+        daily_rets: list[pd.Series] = []
         current_weights = pd.Series(0.0, index=SECTOR_ETFS)
 
         for i in range(1, len(monthly_ends)):
@@ -71,34 +71,51 @@ class AiPexLite(BaseStrategy):
                 new_weights = pd.Series(0.0, index=SECTOR_ETFS)
                 new_weights[top_sectors] = 1.0 / AIPEX_TOP_N
 
-            p_entry = price_df.asof(signal_date)
-            p_exit = price_df.asof(rebalance_date)
-            month_ret = (p_exit / p_entry) - 1
-            gross_ret = float((new_weights * month_ret).sum())
+            # Holding period: signal_date close → rebalance_date close
+            period_mask = (price_df.index > signal_date) & (price_df.index <= rebalance_date)
+            period_df = price_df.loc[period_mask]
+            if period_df.empty:
+                current_weights = new_weights
+                continue
+
+            # Anchor signal_date prices, then compute daily returns across the period
+            anchor = price_df.asof(signal_date).to_frame().T
+            anchor.index = pd.DatetimeIndex([signal_date])
+            extended = pd.concat([anchor, period_df])
+            daily_ret_df = extended.pct_change().dropna()
+
+            # Daily portfolio returns (weighted sum of sector daily returns)
+            period_daily = daily_ret_df.dot(new_weights)
 
             turnover = float((new_weights - current_weights).abs().sum())
             cost_drag = turnover * cost_bps / 10_000
-            net_ret = gross_ret - cost_drag
 
-            portfolio_returns.append({"date": rebalance_date, "net_return": net_ret})
+            # Deduct full rebalance cost from the first day of the holding period
+            if not period_daily.empty:
+                period_daily.iloc[0] -= cost_drag
+
+            daily_rets.append(period_daily)
 
             if turnover > 0.001:
+                p_entry = price_df.asof(signal_date)
+                p_exit = price_df.asof(rebalance_date)
+                month_gross = float(((p_exit / p_entry - 1) * new_weights).sum())
                 trades.append({
                     "date": rebalance_date,
                     "notional": turnover,
-                    "gross_pnl": gross_ret,
+                    "gross_pnl": month_gross,
                     "cost_bps": cost_bps,
-                    "net_pnl": net_ret,
+                    "net_pnl": month_gross - cost_drag,
                 })
 
             current_weights = new_weights
 
-        if not portfolio_returns:
+        if not daily_rets:
             raise ValueError("Not enough data to compute AiPEX-Lite returns. Extend the backtest window.")
 
-        ret_df = pd.DataFrame(portfolio_returns).set_index("date")
-        equity = (1 + ret_df["net_return"]).cumprod() * 100
-        self._equity = (equity / equity.iloc[0] * 100).rename(self.name)
+        daily_returns = pd.concat(daily_rets)
+        equity = (1 + daily_returns).cumprod() * 100
+        self._equity = equity.rename(self.name)
         self._trade_log = pd.DataFrame(trades).set_index("date") if trades else pd.DataFrame()
         self._metrics = tearsheet.compute_all(self._equity)
 
