@@ -71,8 +71,9 @@ html, body, [class*="css"] {
 [data-testid="stMetric"] {
     background-color: #FFFFFF !important;
     border: 1px solid #E8E8E8 !important;
-    padding: 20px 24px 16px 24px !important;
+    padding: 18px 20px 14px 20px !important;
     margin-bottom: 4px !important;
+    overflow: visible !important;
 }
 [data-testid="stMetricLabel"] > div {
     font-size: 10px !important;
@@ -80,12 +81,20 @@ html, body, [class*="css"] {
     letter-spacing: 0.14em !important;
     text-transform: uppercase !important;
     color: #888888 !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
 }
 [data-testid="stMetricValue"] {
-    font-size: 28px !important;
+    font-size: 22px !important;
     font-weight: 700 !important;
     color: #1D1D1B !important;
-    line-height: 1.15 !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+}
+[data-testid="stMetricValue"] > div {
+    white-space: nowrap !important;
+    overflow: visible !important;
 }
 
 /* ── Expanders ── */
@@ -177,8 +186,9 @@ _GRID = "#272727"
 _AXIS = "#444444"
 _FONT = "#CCCCCC"
 
-# Strategy colour palette — legible on dark canvas
-_COLORS = ["#DB0011", "#F0F0F0", "#C9A96E", "#6BAED6"]
+# Strategy colour palette — Bloomberg-terminal-style, legible on dark canvas
+# PUT=HSBC red, BXM=sky blue, VolTarget=amber, AiPEX=emerald
+_COLORS = ["#DB0011", "#38BDF8", "#F59E0B", "#10B981"]
 _STRAT_NAMES = ["CBOE PUT", "CBOE BXM", "Vol-Targeted SPX", "AiPEX-Lite"]
 
 
@@ -369,7 +379,8 @@ elif page == "Strategy Explorer":
         col.metric(label, value)
 
     _section_header("Equity Curve")
-    _strat_color = _COLORS[_ov_names.index(strategy_choice)] if strategy_choice in (_ov_names := [s[0] for s in _STRATEGIES]) else "#DB0011"
+    _ov_names_local = [s[0] for s in _STRATEGIES]
+    _strat_color = _COLORS[_ov_names_local.index(strategy_choice)] if strategy_choice in _ov_names_local else "#DB0011"
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=curve.index, y=curve, name="Equity",
@@ -379,12 +390,15 @@ elif page == "Strategy Explorer":
     st.plotly_chart(fig, use_container_width=True)
 
     dd = drawdown_series(curve)
+    # Parse hex to rgba for fill
+    _hex = _strat_color.lstrip("#")
+    _r, _g, _b = int(_hex[0:2], 16), int(_hex[2:4], 16), int(_hex[4:6], 16)
     fig_dd = go.Figure()
     fig_dd.add_trace(go.Scatter(
         x=dd.index, y=dd * 100,
         fill="tozeroy", name="Drawdown",
-        line=dict(color="#DB0011", width=1),
-        fillcolor="rgba(219,0,17,0.20)",
+        line=dict(color=_strat_color, width=1),
+        fillcolor=f"rgba({_r},{_g},{_b},0.20)",
     ))
     fig_dd.update_layout(**_dark("", height=220, yaxis_ticksuffix="%", yaxis_title="Drawdown (%)"))
     st.plotly_chart(fig_dd, use_container_width=True)
@@ -448,7 +462,7 @@ elif page == "Strategy Comparison":
     _section_header("Cumulative Return")
     fig = go.Figure()
     for name, c, color in zip(_STRAT_NAMES, curves, _COLORS):
-        fig.add_trace(go.Scatter(x=c.index, y=c, name=name, line=dict(color=color, width=1.8)))
+        fig.add_trace(go.Scatter(x=c.index, y=c, name=name, line=dict(color=color, width=2)))
     fig.update_layout(**_dark("", height=420, yaxis_title="Index (base 100)"))
     st.plotly_chart(fig, use_container_width=True)
 
