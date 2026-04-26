@@ -315,6 +315,25 @@ _STRATEGIES = [
 _STRATEGY_MAP = {name: (desc, runner) for name, desc, runner in _STRATEGIES}
 
 
+# ── Date range guard — warn before running if outside pre-cached window ───────
+_CACHE_START = "2007-01-01"
+_CACHE_END   = BACKTEST_END  # "2026-04-25"
+_date_warning = False
+try:
+    _ts = pd.Timestamp(start_date)
+    _te = pd.Timestamp(end_date)
+    if _ts < pd.Timestamp(_CACHE_START) or _te > pd.Timestamp(_CACHE_END) or _ts >= _te:
+        _date_warning = True
+except Exception:
+    _date_warning = True
+
+if _date_warning:
+    st.warning(
+        f"**Date range outside pre-cached window ({_CACHE_START} – {_CACHE_END}).**  \n"
+        "Fetching live data from yfinance / FRED — this may fail on Streamlit Cloud "
+        "due to network restrictions. Reset dates in the sidebar to use cached data."
+    )
+
 # ── Overview ──────────────────────────────────────────────────────────────────
 if page == "Overview":
     _page_header(

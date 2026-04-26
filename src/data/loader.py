@@ -1,9 +1,10 @@
 from __future__ import annotations
+import datetime
 import io
 import pandas as pd
 import requests
 import yfinance as yf
-from src.data.cache import cache_key, load, save
+from src.data.cache import cache_key, load, load_covering, save
 
 
 def fetch_prices(
@@ -15,15 +16,28 @@ def fetch_prices(
     """Fetch adjusted close prices from yfinance. Returns pd.Series indexed by date."""
     key = cache_key(ticker, start, end)
     if not force_refresh:
+        # 1. exact cache hit
         cached = load(key)
         if cached is not None:
             return cached["close"]
+        # 2. slice from any wider cached file — handles custom date ranges without network
+        covering = load_covering(ticker, start, end)
+        if covering is not None:
+            return covering["close"]
 
-    df = yf.download(ticker, start=start, end=end, auto_adjust=True, progress=False)
+    # Clamp end to yesterday — yfinance has no data for today or future dates
+    end_clamped = str(min(
+        pd.Timestamp(end).date(),
+        datetime.date.today() - datetime.timedelta(days=1),
+    ))
+    df = yf.download(ticker, start=start, end=end_clamped, auto_adjust=True, progress=False)
     if df.empty:
-        raise ValueError(f"yfinance returned no data for {ticker} ({start}–{end})")
+        raise ValueError(f"yfinance returned no data for {ticker} ({start}–{end_clamped})")
 
-    series = df["Close"].squeeze()
+    close = df["Close"]
+    if isinstance(close, pd.DataFrame):
+        close = close.iloc[:, 0]
+    series = close.squeeze()
     series.index = pd.to_datetime(series.index)
     save(key, pd.DataFrame({"close": series}))
     return series
