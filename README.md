@@ -2,7 +2,7 @@
 
 **Live demo:** [qis-backtester-4vpappvczjyctft9mkye7wj.streamlit.app](https://qis-backtester-4vpappvczjyctft9mkye7wj.streamlit.app)  
 **GitHub:** https://github.com/jjhalasz21/QIS-backtester  
-**Author:** Jack Halasz
+**Author:** J H
 
 A Quantitative Investment Strategies (QIS) backtesting platform simulating four systematic equity strategies against institutional and insurance portfolio constraints (Solvency II / NAIC).
 
