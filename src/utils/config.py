@@ -5,7 +5,7 @@ ROOT = Path(__file__).parent.parent.parent
 DATA_DIR = ROOT / "data"
 
 BACKTEST_START = "2007-01-01"
-BACKTEST_END = datetime.date.today().strftime("%Y-%m-%d")
+BACKTEST_END = "2026-04-25"  # pinned — update monthly; keeps parquet cache keys stable on Streamlit Cloud
 
 SPX_TICKER = "^GSPC"
 SPY_TICKER = "SPY"

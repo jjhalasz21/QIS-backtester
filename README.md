@@ -1,6 +1,6 @@
 # QIS Backtester
 
-**Live demo:** [your-streamlit-url]  
+**Live demo:** [qis-backtester-4vpappvczjyctft9mkye7wj.streamlit.app](https://qis-backtester-4vpappvczjyctft9mkye7wj.streamlit.app)  
 **GitHub:** https://github.com/jjhalasz21/QIS-backtester  
 **Author:** Jack Halasz
 
@@ -102,4 +102,4 @@ Each strategy exposes the same interface (`run()`, `metrics()`, `equity_curve()`
 
 ## Resume Bullet
 
-> Built a QIS backtesting platform in Python simulating four systematic equity strategies (put-writing, covered calls, vol-targeting, and an AiPEX-inspired factor rotation) with pure numpy Black-Scholes pricing and institutional/insurance framing including Solvency II capital efficiency proxies. [[GitHub](https://github.com/jjhalasz21/QIS-backtester)] [[Live demo](your-streamlit-url)]
+> Built a QIS backtesting platform in Python simulating four systematic equity strategies (put-writing, covered calls, vol-targeting, and an AiPEX-inspired factor rotation) with pure numpy Black-Scholes pricing and institutional/insurance framing including Solvency II capital efficiency proxies. [[GitHub](https://github.com/jjhalasz21/QIS-backtester)] [[Live demo](https://qis-backtester-4vpappvczjyctft9mkye7wj.streamlit.app)]

@@ -1,4 +1,4 @@
-/data/
+# data/ intentionally tracked — parquet cache shipped with repo for Streamlit Cloud cold-start performance
 .env
 __pycache__/
 *.pyc
