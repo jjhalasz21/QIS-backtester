@@ -208,12 +208,140 @@ elif page == "Strategy Explorer":
             st.write(framing.get(key, ""))
 
 elif page == "Strategy Comparison":
+    from src.strategies.put_write import PutWrite
+    from src.strategies.covered_call import CoveredCall
+    from src.strategies.vol_target import VolTarget
+    from src.strategies.aipex_lite import AiPexLite
+
     st.title("Strategy Comparison")
-    st.info("Additional strategies coming soon. Currently showing: CBOE PUT.")
+    st.caption(f"Transaction costs: {cost_mode.upper()} | {start_date} – {end_date}")
+
+    # Unpack all 4 strategies
+    put_curve, put_m, put_log, put_framing = _run_put_write(start_date, end_date, cost_mode, custom_bps)
+    bxm_curve, bxm_m, bxm_log, bxm_framing = _run_covered_call(start_date, end_date, cost_mode, custom_bps)
+    vt_curve, vt_m, vt_log, vt_framing = _run_vol_target(start_date, end_date, cost_mode, custom_bps)
+    aipex_curve, aipex_m, aipex_log, aipex_framing = _run_aipex(start_date, end_date, cost_mode, custom_bps)
+
+    # Cumulative return overlay
+    st.subheader("Cumulative Return (base 100)")
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd"]
+    names = ["CBOE PUT", "CBOE BXM", "Vol-Targeted SPX", "AiPEX-Lite"]
+    curves = [put_curve, bxm_curve, vt_curve, aipex_curve]
+    fig = go.Figure()
+    for name, c, color in zip(names, curves, colors):
+        fig.add_trace(go.Scatter(x=c.index, y=c, name=name, line=dict(color=color)))
+    fig.update_layout(hovermode="x unified", height=400)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Metric table — build inline from tuples (comparisons module expects strategy objects)
+    st.subheader("Performance Metrics")
+    metric_rows = []
+    for name, m in zip(names, [put_m, bxm_m, vt_m, aipex_m]):
+        metric_rows.append({
+            "Strategy": name,
+            "CAGR": f"{m['cagr']:.1%}",
+            "Vol": f"{m['vol']:.1%}",
+            "Sharpe": f"{m['sharpe']:.2f}",
+            "Sortino": f"{m['sortino']:.2f}",
+            "Max DD": f"{m['max_dd']:.1%}",
+            "Skew": f"{m['skew']:.2f}",
+            "Best Mo.": f"{m['best_month']:.1%}",
+            "Worst Mo.": f"{m['worst_month']:.1%}",
+            "VaR 95%": f"{m['var_95']:.2%}",
+            "CVaR 95%": f"{m['cvar_95']:.2%}",
+        })
+    st.dataframe(pd.DataFrame(metric_rows).set_index("Strategy"), use_container_width=True)
+
+    # Correlation matrix
+    st.subheader("Return Correlations")
+    ret_df = pd.DataFrame({
+        n: c.pct_change().dropna()
+        for n, c in zip(names, curves)
+    })
+    corr = ret_df.corr()
+    fig_corr = px.imshow(
+        corr, text_auto=".2f",
+        color_continuous_scale="RdYlGn",
+        color_continuous_midpoint=0,
+        zmin=-1, zmax=1,
+    )
+    fig_corr.update_layout(height=350)
+    st.plotly_chart(fig_corr, use_container_width=True)
+
+    # Cost drag
+    st.subheader("Cost Drag (Annualized)")
+    drag_rows = []
+    for name, log, curve in zip(names, [put_log, bxm_log, vt_log, aipex_log], curves):
+        if log.empty or "gross_pnl" not in log.columns:
+            drag = 0.0
+        else:
+            total_cost = (log["gross_pnl"] - log["net_pnl"]).sum()
+            n_years = len(curve) / 252
+            drag = total_cost / n_years if n_years > 0 else 0.0
+        drag_rows.append({"Strategy": name, "Annual Cost Drag": f"{drag:.3%}"})
+    st.dataframe(pd.DataFrame(drag_rows).set_index("Strategy"), use_container_width=True)
+    st.caption(
+        "Cost drag = gross P&L – net P&L from trade log, annualized. "
+        "Zero for CBOE index strategies (costs embedded in published index)."
+    )
 
 elif page == "Client Pitch":
     st.title("Client Pitch View")
-    st.info("Select a strategy to generate the pitch view. Coming soon.")
+    pitch_choice = st.sidebar.selectbox(
+        "Strategy for pitch",
+        [s[0] for s in _STRATEGIES],
+    )
+    _pitch_desc, _pitch_runner = _STRATEGY_MAP[pitch_choice]
+    pitch_curve, pitch_m, pitch_log, pitch_framing = _pitch_runner(start_date, end_date, cost_mode, custom_bps)
+
+    st.markdown(f"## {pitch_choice}")
+    st.markdown(f"*{_pitch_desc}*")
+    st.markdown("---")
+
+    st.markdown("### Investment Thesis")
+    st.info(pitch_framing.get("structurer_pitch", ""))
+
+    st.markdown("### Historical Performance")
+    cols = st.columns(5)
+    cols[0].metric("CAGR", f"{pitch_m['cagr']:.1%}")
+    cols[1].metric("Sharpe", f"{pitch_m['sharpe']:.2f}")
+    cols[2].metric("Max Drawdown", f"{pitch_m['max_dd']:.1%}")
+    cols[3].metric("Annualized Vol", f"{pitch_m['vol']:.1%}")
+    cols[4].metric("Sortino", f"{pitch_m['sortino']:.2f}")
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=pitch_curve.index, y=pitch_curve,
+        name=pitch_choice, line=dict(color="#1f77b4", width=2),
+    ))
+    fig.update_layout(
+        title=f"Cumulative Return ({start_date[:4]}–present, base 100)",
+        height=300,
+        hovermode="x unified",
+        showlegend=False,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("### Institutional Fit")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Return Profile**")
+        st.write(pitch_framing.get("return_profile", ""))
+        st.markdown("**Liability Fit**")
+        st.write(pitch_framing.get("liability_fit", ""))
+    with col2:
+        st.markdown("**Capital Efficiency**")
+        st.write(pitch_framing.get("capital_efficiency", ""))
+        st.markdown("**Regulatory Treatment**")
+        st.write(pitch_framing.get("regulatory_treatment", ""))
+
+    st.markdown("### Key Risks & Limitations")
+    st.warning(
+        "• Backtest uses synthetic IV where applicable — not historical options data.\n"
+        "• Regulatory metrics are directional proxies, not production-grade calculations.\n"
+        "• Past performance does not predict future results.\n"
+        "• CBOE index strategies use published index values; individual execution may differ."
+    )
 
 elif page == "About":
     st.title("About & Methodology")
