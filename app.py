@@ -208,11 +208,6 @@ elif page == "Strategy Explorer":
             st.write(framing.get(key, ""))
 
 elif page == "Strategy Comparison":
-    from src.strategies.put_write import PutWrite
-    from src.strategies.covered_call import CoveredCall
-    from src.strategies.vol_target import VolTarget
-    from src.strategies.aipex_lite import AiPexLite
-
     st.title("Strategy Comparison")
     st.caption(f"Transaction costs: {cost_mode.upper()} | {start_date} – {end_date}")
 
@@ -347,11 +342,11 @@ elif page == "About":
     st.title("About & Methodology")
     st.markdown("""
     ### Data Sources
-    - **CBOE PUT / BXM indices:** FRED via pandas-datareader (series: PUTWRITE, BXMCBOE). Falls back to yfinance if unavailable.
+    - **CBOE PUT / BXM indices:** Direct FRED CSV download (series: PUTWRITE, BXMCBOE). Falls back to yfinance if unavailable.
     - **SPX, SPY, VIX, sector ETFs:** yfinance with local parquet cache.
 
     ### Synthetic IV
-    Not used in V1 strategies A and B (published index levels used directly). Strategy C uses 20-day rolling realized vol on SPX as a vol proxy — labeled as synthetic throughout.
+    Strategies A (CBOE PUT) and B (CBOE BXM) use published index levels directly — no synthetic IV. Strategy C (Vol-Targeted SPX) uses 20-day rolling realized vol on SPY as a vol proxy. Strategy E (AiPEX-Lite) uses sector ETF price data only. All synthetic vol usage is labeled throughout the dashboard.
 
     ### Transaction Cost Model
     Costs are applied at trade execution and stored with each trade record. The sidebar toggle re-applies costs post-hoc without re-running the backtest.
