@@ -14,7 +14,7 @@ _SPX_LONG_RUN_VOL = 0.15
 def scr_equity_proxy(equity: pd.Series) -> float:
     """
     Simplified Solvency II SCR-equity proxy.
-    Approximation: 39% × |worst 1-year drawdown|.
+    Approximation: 39% × |worst 1-year rolling return|.
     Directional proxy only — not EIOPA-compliant.
     """
     annual_returns = equity.pct_change(_TRADING_DAYS).dropna()

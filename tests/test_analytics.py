@@ -25,6 +25,7 @@ def test_naic_rbc_type():
     assert isinstance(naic_rbc_proxy(_EQUITY), float)
 
 def test_high_vol_strategy_has_higher_naic_rbc():
+    np.random.seed(42)
     high_vol_rets = np.random.normal(0.0003, 0.025, 252 * 5)
     high_vol_eq = pd.Series(
         100 * np.cumprod(1 + high_vol_rets),
