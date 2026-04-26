@@ -14,6 +14,11 @@ def fetch_prices(
     force_refresh: bool = False,
 ) -> pd.Series:
     """Fetch adjusted close prices from yfinance. Returns pd.Series indexed by date."""
+    # Clamp end before cache lookups so "today" matches parquet files ending yesterday
+    end = str(min(
+        pd.Timestamp(end).date(),
+        datetime.date.today() - datetime.timedelta(days=1),
+    ))
     key = cache_key(ticker, start, end)
     if not force_refresh:
         # 1. exact cache hit
@@ -25,14 +30,9 @@ def fetch_prices(
         if covering is not None:
             return covering["close"]
 
-    # Clamp end to yesterday — yfinance has no data for today or future dates
-    end_clamped = str(min(
-        pd.Timestamp(end).date(),
-        datetime.date.today() - datetime.timedelta(days=1),
-    ))
-    df = yf.download(ticker, start=start, end=end_clamped, auto_adjust=True, progress=False)
+    df = yf.download(ticker, start=start, end=end, auto_adjust=True, progress=False)
     if df.empty:
-        raise ValueError(f"yfinance returned no data for {ticker} ({start}–{end_clamped})")
+        raise ValueError(f"yfinance returned no data for {ticker} ({start}–{end})")
 
     close = df["Close"]
     if isinstance(close, pd.DataFrame):
