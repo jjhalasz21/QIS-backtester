@@ -62,8 +62,8 @@ def test_gamma_positive():
     g = gamma(_S, _K, _T, _r, _sig)
     assert g > 0
 
-def test_call_vega_equals_put_vega():
-    assert abs(vega(_S, _K, _T, _r, _sig, "call") - vega(_S, _K, _T, _r, _sig, "put")) < 1e-10
+def test_vega_is_positive():
+    assert vega(_S, _K, _T, _r, _sig) > 0
 
 def test_call_theta_negative():
     t = theta(_S, _K, _T, _r, _sig, option_type="call")

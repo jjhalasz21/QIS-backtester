@@ -1,3 +1,16 @@
+"""
+Black-Scholes option pricing and analytical Greeks — pure numpy, no pricing library.
+
+Parameter conventions (all functions):
+  S     spot price (> 0)
+  K     strike price (> 0)
+  T     time to expiry in years (calendar-day convention); T=0 returns intrinsic value
+  r     continuously compounded risk-free rate, annualized
+  sigma implied volatility, annualized lognormal (> 0)
+
+Callers must ensure S > 0, K > 0, sigma > 0 before T > 0 paths.
+Vega and rho are scaled per 1% change (divided by 100); gamma is unscaled.
+"""
 import numpy as np
 from scipy.stats import norm
 
@@ -50,10 +63,8 @@ def gamma(S: float, K: float, T: float, r: float, sigma: float) -> float:
     return float(norm.pdf(d1) / (S * sigma * np.sqrt(T)))
 
 
-def vega(
-    S: float, K: float, T: float, r: float, sigma: float, option_type: str = "call"
-) -> float:
-    """Vega: dV/dsigma per 1% change in vol. Same for calls and puts."""
+def vega(S: float, K: float, T: float, r: float, sigma: float) -> float:
+    """Vega: dV/dsigma per 1% change in vol. Identical for calls and puts."""
     if T <= 0:
         return 0.0
     d1 = _d1(S, K, T, r, sigma)
@@ -63,11 +74,11 @@ def vega(
 def theta(
     S: float, K: float, T: float, r: float, sigma: float, option_type: str = "call"
 ) -> float:
-    """Theta: dV/dt per calendar day (negative = time decay)."""
+    """Theta: dV/dt per calendar day (divide annualized by 365; T must be in years)."""
     if T <= 0:
         return 0.0
     d1 = _d1(S, K, T, r, sigma)
-    d2 = _d2(S, K, T, r, sigma)
+    d2 = d1 - sigma * np.sqrt(T)
     term1 = -(S * norm.pdf(d1) * sigma) / (2 * np.sqrt(T))
     if option_type == "call":
         term2 = -r * K * np.exp(-r * T) * norm.cdf(d2)
