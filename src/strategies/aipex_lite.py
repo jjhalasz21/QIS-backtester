@@ -35,8 +35,11 @@ class AiPexLite(BaseStrategy):
         cost_mode: str = "default",
         custom_bps: float = 0.0,
     ) -> None:
-        prices = {t: _fetch_prices(t, start, end) for t in SECTOR_ETFS}
-        vix = _fetch_prices(VIX_TICKER, start, end)
+        # Fetch 13 extra months before start so the 12-1 month momentum lookback
+        # has data on the very first signal date in the user's window.
+        lookback_start = (pd.Timestamp(start) - pd.DateOffset(months=13)).strftime("%Y-%m-%d")
+        prices = {t: _fetch_prices(t, lookback_start, end) for t in SECTOR_ETFS}
+        vix = _fetch_prices(VIX_TICKER, lookback_start, end)
 
         price_df = pd.DataFrame(prices).sort_index().dropna()
         vix = vix.reindex(price_df.index).ffill()
@@ -114,6 +117,8 @@ class AiPexLite(BaseStrategy):
             raise ValueError("Not enough data to compute AiPEX-Lite returns. Extend the backtest window.")
 
         daily_returns = pd.concat(daily_rets)
+        # Trim to user's requested window (lookback data was only for momentum calculation)
+        daily_returns = daily_returns[daily_returns.index >= pd.Timestamp(start)]
         equity = (1 + daily_returns).cumprod() * 100
         self._equity = equity.rename(self.name)
         self._trade_log = pd.DataFrame(trades).set_index("date") if trades else pd.DataFrame()
