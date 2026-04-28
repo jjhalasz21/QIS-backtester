@@ -263,8 +263,17 @@ if cost_mode == "custom":
 
 st.sidebar.markdown('<hr style="border-color:#3A3A3A;margin:16px 0;">', unsafe_allow_html=True)
 
-start_date = st.sidebar.text_input("Backtest start", value=BACKTEST_START)
-end_date   = st.sidebar.text_input("Backtest end",   value=BACKTEST_END)
+_date_range = st.sidebar.date_input(
+    "Date range",
+    value=(pd.Timestamp(BACKTEST_START).date(), pd.Timestamp(BACKTEST_END).date()),
+    min_value=pd.Timestamp("2007-01-01").date(),
+    max_value=pd.Timestamp(BACKTEST_END).date(),
+)
+if isinstance(_date_range, (list, tuple)) and len(_date_range) == 2:
+    start_date, end_date = str(_date_range[0]), str(_date_range[1])
+else:
+    start_date = str(_date_range[0]) if isinstance(_date_range, (list, tuple)) else str(_date_range)
+    end_date   = BACKTEST_END
 
 st.sidebar.markdown('<hr style="border-color:#3A3A3A;margin:16px 0 8px 0;">', unsafe_allow_html=True)
 st.sidebar.markdown('<div style="font-size:10px;color:#555555;">Data: FRED · yfinance</div>', unsafe_allow_html=True)
